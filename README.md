@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Code style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)
 ![Lint: Ruff](https://img.shields.io/badge/lint-ruff-purple)
-![Coverage](https://img.shields.io/badge/coverage-71%25-yellowgreen)
+![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
 ![License](https://img.shields.io/github/license/LeonidLodygin/CFPQ_Evaluator)
 
 `CFPQ Evaluator` is an experiment runner for CFPQ solvers. Datasets and solvers are described in config files, every
