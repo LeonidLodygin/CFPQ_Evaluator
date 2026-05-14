@@ -1,0 +1,8 @@
+[[solver]]
+id = "mock"
+label = "Mock solver"
+type = "command"
+cwd = ".."
+argv = ["python3", "mock_solver.py", "--graph", "{graph}", "--grammar", "{grammar}"]
+edges_regex = "#(?:SEdges|CountEdges)\\s+(\\d+)"
+time_regex = "AnalysisTime\\s+([\\d.]+)"

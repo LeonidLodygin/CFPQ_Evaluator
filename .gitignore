@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CFPQ Evaluator local outputs
+results/
+local_runs/
+prepared_graphs/
+
+# Local experiment scratch
+*.stderr
+*.stdout
+*.time

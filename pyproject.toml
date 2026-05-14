@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfpq-evaluator"
+version = "0.1.0"
+description = "A lightweight experiment evaluator for CFPQ solvers."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "tomli>=2.0.1; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.0",
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+cfpq-eval = "cfpq_evaluator.cli:main"
+cfpq-evaluator-adapter = "cfpq_evaluator.solver_adapters:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
