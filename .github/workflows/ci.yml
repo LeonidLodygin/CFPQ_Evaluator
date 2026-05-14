@@ -36,8 +36,11 @@ jobs:
       - name: Check Black formatting
         run: python -m black --check .
 
-      - name: Run tests
-        run: python -m pytest
+      - name: Run tests with coverage
+        run: |
+          python -m coverage run -m pytest
+          python -m coverage report
+          python -m coverage xml
 
       - name: Check CLI plan example
         run: |

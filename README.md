@@ -1,5 +1,12 @@
 # CFPQ Evaluator
 
+[![CI](https://github.com/LeonidLodygin/CFPQ_Evaluator/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonidLodygin/CFPQ_Evaluator/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Code style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)
+![Lint: Ruff](https://img.shields.io/badge/lint-ruff-purple)
+![Coverage](https://img.shields.io/badge/coverage-71%25-yellowgreen)
+![License](https://img.shields.io/github/license/LeonidLodygin/CFPQ_Evaluator)
+
 `CFPQ Evaluator` is an experiment runner for CFPQ solvers. Datasets and solvers are described in config files, every
 solver is run several times, raw results are saved, and a compact summary is
 generated.
