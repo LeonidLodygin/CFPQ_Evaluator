@@ -68,11 +68,11 @@ def main(argv: list[str] | None = None) -> int:
             "kotgll": run_kotgll,
         }[args.adapter](args.graph, args.grammar, args.timeout, args.work)
     except AdapterError as exc:
-        print(f"ORCH_INCOMPATIBLE {exc}")
+        print(f"EVAL_INCOMPATIBLE {exc}")
         return 0
 
-    print(f"ORCH_ANSWER_EDGES {result[0]}")
-    print(f"ORCH_TIME_SEC {result[1]}")
+    print(f"EVAL_ANSWER_EDGES {result[0]}")
+    print(f"EVAL_TIME_SEC {result[1]}")
     return 0
 
 

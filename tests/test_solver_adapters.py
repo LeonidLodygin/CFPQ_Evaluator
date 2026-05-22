@@ -139,8 +139,8 @@ def test_adapter_cli_routes_to_selected_adapter(monkeypatch, capsys, tmp_path: P
     assert exit_code == 0
     assert captured == {"graph": graph, "grammar": grammar, "timeout": 9, "work": work}
     assert capsys.readouterr().out.splitlines() == [
-        "ORCH_ANSWER_EDGES 11",
-        "ORCH_TIME_SEC 0.75",
+        "EVAL_ANSWER_EDGES 11",
+        "EVAL_TIME_SEC 0.75",
     ]
 
 
@@ -161,7 +161,7 @@ def test_adapter_cli_reports_incompatible_solver(monkeypatch, capsys, tmp_path: 
     )
 
     assert exit_code == 0
-    assert capsys.readouterr().out == "ORCH_INCOMPATIBLE nope\n"
+    assert capsys.readouterr().out == "EVAL_INCOMPATIBLE nope\n"
 
 
 def test_run_gigascale_writes_relation_csvs(monkeypatch, tmp_path: Path):

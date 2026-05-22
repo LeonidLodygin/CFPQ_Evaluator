@@ -53,7 +53,7 @@ def test_command_runner_reports_adapter_incompatible_marker(monkeypatch, tmp_pat
             answer_edges="",
             time_sec="",
             ram_kb="",
-            stdout="ORCH_INCOMPATIBLE missing kotgll grammar\n",
+            stdout="EVAL_INCOMPATIBLE missing kotgll grammar\n",
             stderr="",
         )
 
@@ -64,8 +64,8 @@ def test_command_runner_reports_adapter_incompatible_marker(monkeypatch, tmp_pat
         type="command",
         options={
             "argv": ["tool"],
-            "edges_regex": r"ORCH_ANSWER_EDGES\s+(\d+)",
-            "time_regex": r"ORCH_TIME_SEC\s+([\d.]+)",
+            "edges_regex": r"EVAL_ANSWER_EDGES\s+(\d+)",
+            "time_regex": r"EVAL_TIME_SEC\s+([\d.]+)",
         },
     )
 

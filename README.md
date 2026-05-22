@@ -294,3 +294,4 @@ docker run --rm \
 
 The image contains only the evaluator. Put solver commands in your mounted
 `solvers.toml` and make sure those commands are available in the container.
+

@@ -68,7 +68,7 @@ class ProcessRunner:
             measured_command = [
                 "/usr/bin/time",
                 "-f",
-                "ORCH_PEAK_RSS_KB=%M",
+                "EVAL_PEAK_RSS_KB=%M",
                 "-o",
                 str(time_file),
                 *command,
@@ -111,7 +111,7 @@ class ProcessRunner:
 
         ram_kb = ""
         if time_file and time_file.exists():
-            match = re.search(r"ORCH_PEAK_RSS_KB=(\d+)", time_file.read_text(encoding="utf-8"))
+            match = re.search(r"EVAL_PEAK_RSS_KB=(\d+)", time_file.read_text(encoding="utf-8"))
             if match:
                 ram_kb = match.group(1)
             time_file.unlink(missing_ok=True)
@@ -167,7 +167,7 @@ class CommandRunner(ProcessRunner):
 
         raw = self.run_process(command, cwd=cwd, timeout_sec=timeout_sec, env=env)
         stdout = raw.stdout
-        incompatible = re.search(r"^ORCH_INCOMPATIBLE\s+(.+)$", stdout, re.MULTILINE)
+        incompatible = re.search(r"^EVAL_INCOMPATIBLE\s+(.+)$", stdout, re.MULTILINE)
         if incompatible:
             raise IncompatibleSolverError(incompatible.group(1))
         return RunResult(
