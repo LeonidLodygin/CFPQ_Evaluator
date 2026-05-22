@@ -23,7 +23,27 @@ class RunResult:
 
 
 class SolverError(Exception):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        command: Optional[List[str]] = None,
+        returncode: Optional[int] = None,
+        stdout: str = "",
+        stderr: str = "",
+        error_kind: str = "solver_error",
+    ):
+        super().__init__(message)
+        self.command = command
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        self.error_kind = error_kind
+
+    def summary(self) -> str:
+        if self.returncode is None:
+            return str(self)
+        return f"{self}; returncode={self.returncode}"
 
 
 class TimeoutSolverError(SolverError):
@@ -87,26 +107,33 @@ class ProcessRunner:
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            raise TimeoutSolverError(f"Solver timed out after {timeout_sec} seconds") from exc
+            raise TimeoutSolverError(
+                f"Solver timed out after {timeout_sec} seconds",
+                command=command,
+                error_kind="timeout",
+            ) from exc
         elapsed = time.monotonic() - started
 
         # Docker/Linux OOM kills and JVM/native allocation failures surface in
         # different ways, so classify them before generic non-zero failures.
         if is_oom(process.returncode, process.stdout, process.stderr):
             raise OutOfMemorySolverError(
-                f"Solver was killed by OOM or memory allocation failure\n"
-                f"Exit code: {process.returncode}\n"
-                f"Command: {shlex.join(command)}\n"
-                f"stdout:\n{process.stdout}\n"
-                f"stderr:\n{process.stderr}"
+                "Solver was killed by OOM or memory allocation failure",
+                command=command,
+                returncode=process.returncode,
+                stdout=process.stdout,
+                stderr=process.stderr,
+                error_kind="oom",
             )
 
         if process.returncode != 0:
             raise SolverError(
-                f"Solver exited with code {process.returncode}\n"
-                f"Command: {shlex.join(command)}\n"
-                f"stdout:\n{process.stdout}\n"
-                f"stderr:\n{process.stderr}"
+                "Solver exited with non-zero code",
+                command=command,
+                returncode=process.returncode,
+                stdout=process.stdout,
+                stderr=process.stderr,
+                error_kind="nonzero_exit",
             )
 
         ram_kb = ""
@@ -141,7 +168,8 @@ class CommandRunner(ProcessRunner):
             allowed = set(self.solver.options["only_grammars"])
             if grammar_path.stem not in allowed:
                 raise IncompatibleSolverError(
-                    f"{self.solver.id} does not support grammar {grammar_path.stem}"
+                    f"{self.solver.id} does not support grammar {grammar_path.stem}",
+                    error_kind="unsupported_grammar",
                 )
 
         # Placeholders keep solver configs declarative while still allowing
@@ -169,7 +197,13 @@ class CommandRunner(ProcessRunner):
         stdout = raw.stdout
         incompatible = re.search(r"^EVAL_INCOMPATIBLE\s+(.+)$", stdout, re.MULTILINE)
         if incompatible:
-            raise IncompatibleSolverError(incompatible.group(1))
+            raise IncompatibleSolverError(
+                incompatible.group(1),
+                command=command,
+                stdout=raw.stdout,
+                stderr=raw.stderr,
+                error_kind="adapter_incompatible",
+            )
         return RunResult(
             answer_edges=parse_required(stdout, str(self.solver.options["edges_regex"])),
             time_sec=parse_required(stdout, str(self.solver.options["time_regex"])),
@@ -189,7 +223,10 @@ def rewritten_grammar_path(grammar_path: Path) -> Path:
 def parse_required(text: str, pattern: str) -> str:
     match = re.search(pattern, text)
     if not match:
-        raise IncompatibleSolverError(f"Could not parse pattern {pattern!r} from solver output")
+        raise IncompatibleSolverError(
+            f"Could not parse pattern {pattern!r} from solver output",
+            error_kind="parse_failed",
+        )
     return match.group(1)
 
 

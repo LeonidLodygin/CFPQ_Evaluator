@@ -8,6 +8,7 @@ from cfpq_evaluator.runners import (
     IncompatibleSolverError,
     OutOfMemorySolverError,
     RunResult,
+    SolverError,
     is_oom,
     parse_required,
     rewritten_grammar_path,
@@ -87,7 +88,7 @@ def test_process_runner_classifies_oom(monkeypatch):
 
     monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: Process())
 
-    with pytest.raises(OutOfMemorySolverError):
+    with pytest.raises(OutOfMemorySolverError) as exc_info:
         CommandRunner(
             Solver(
                 id="mock",
@@ -96,6 +97,40 @@ def test_process_runner_classifies_oom(monkeypatch):
                 options={"argv": ["tool"], "edges_regex": "x", "time_regex": "y"},
             )
         ).run_process(["tool"], cwd=None, timeout_sec=None)
+
+    exc = exc_info.value
+    assert exc.command == ["tool"]
+    assert exc.returncode == 137
+    assert exc.stderr == "Killed"
+    assert exc.error_kind == "oom"
+    assert exc.summary() == "Solver was killed by OOM or memory allocation failure; returncode=137"
+
+
+def test_process_runner_records_nonzero_exit_details(monkeypatch):
+    class Process:
+        returncode = 2
+        stdout = "solver stdout"
+        stderr = "solver stderr"
+
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: Process())
+
+    with pytest.raises(SolverError) as exc_info:
+        CommandRunner(
+            Solver(
+                id="mock",
+                label="Mock",
+                type="command",
+                options={"argv": ["tool"], "edges_regex": "x", "time_regex": "y"},
+            )
+        ).run_process(["tool"], cwd=None, timeout_sec=None)
+
+    exc = exc_info.value
+    assert exc.command == ["tool"]
+    assert exc.returncode == 2
+    assert exc.stdout == "solver stdout"
+    assert exc.stderr == "solver stderr"
+    assert exc.error_kind == "nonzero_exit"
+    assert exc.summary() == "Solver exited with non-zero code; returncode=2"
 
 
 def test_command_runner_substitutes_placeholders_and_parses_output(monkeypatch, tmp_path: Path):

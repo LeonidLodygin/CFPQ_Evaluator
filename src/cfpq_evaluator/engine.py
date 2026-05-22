@@ -105,13 +105,13 @@ def run_experiments(
                             }
                         )
                     except TimeoutSolverError as exc:
-                        row.update({"status": "timeout", "message": str(exc)})
+                        row.update({"status": "timeout", "message": exc.summary()})
                     except IncompatibleSolverError as exc:
-                        row.update({"status": "incompatible", "message": str(exc)})
+                        row.update({"status": "incompatible", "message": exc.summary()})
                     except OutOfMemorySolverError as exc:
-                        row.update({"status": "oom", "message": str(exc)})
+                        row.update({"status": "oom", "message": exc.summary()})
                     except SolverError as exc:
-                        row.update({"status": "failed", "message": str(exc)})
+                        row.update({"status": "failed", "message": exc.summary()})
                     append_raw_row(raw_path, row)
                     report(
                         progress,
