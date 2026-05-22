@@ -105,13 +105,27 @@ def run_experiments(
                             }
                         )
                     except TimeoutSolverError as exc:
-                        row.update({"status": "timeout", "message": exc.summary()})
+                        record_error(
+                            logs_root, dataset.name, solver.id, round_number, row, "timeout", exc
+                        )
                     except IncompatibleSolverError as exc:
-                        row.update({"status": "incompatible", "message": exc.summary()})
+                        record_error(
+                            logs_root,
+                            dataset.name,
+                            solver.id,
+                            round_number,
+                            row,
+                            "incompatible",
+                            exc,
+                        )
                     except OutOfMemorySolverError as exc:
-                        row.update({"status": "oom", "message": exc.summary()})
+                        record_error(
+                            logs_root, dataset.name, solver.id, round_number, row, "oom", exc
+                        )
                     except SolverError as exc:
-                        row.update({"status": "failed", "message": exc.summary()})
+                        record_error(
+                            logs_root, dataset.name, solver.id, round_number, row, "failed", exc
+                        )
                     append_raw_row(raw_path, row)
                     report(
                         progress,
@@ -128,6 +142,19 @@ def run_experiments(
                     pass
 
     return write_summary(raw_path, out_dir / "summary.md")
+
+
+def record_error(
+    logs_root: Path,
+    dataset_name: str,
+    solver_id: str,
+    round_number: int,
+    row: dict[str, str],
+    status: str,
+    exc: SolverError,
+) -> None:
+    write_log(logs_root, dataset_name, solver_id, round_number, exc.stdout, exc.stderr)
+    row.update({"status": status, "message": exc.summary()})
 
 
 def report(progress: Optional[ProgressReporter], message: str) -> None:

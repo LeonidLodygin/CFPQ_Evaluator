@@ -210,3 +210,50 @@ def test_run_experiments_creates_work_dir_when_solver_uses_work_placeholder(tmp_
     )
 
     assert (tmp_path / "results" / "work" / "line" / "mock" / "1").is_dir()
+
+
+def test_run_experiments_writes_logs_for_failed_solver(tmp_path: Path):
+    graph_dir = tmp_path / "graphs" / "line"
+    grammar = tmp_path / "grammars" / "g.cnf"
+    solver_script = tmp_path / "solver.py"
+    write_mtx(graph_dir / "a.mtx", "2 2 1\n1 2\n")
+    grammar.parent.mkdir()
+    grammar.write_text("S\ta\n\nCount:\nS\n", encoding="utf-8")
+    solver_script.write_text(
+        "import sys\n"
+        "print('failure stdout')\n"
+        "print('failure stderr', file=sys.stderr)\n"
+        "raise SystemExit(2)\n",
+        encoding="utf-8",
+    )
+
+    run_experiments(
+        datasets=[Dataset(name="line", graph=graph_dir, grammar=grammar)],
+        solvers=[
+            Solver(
+                id="mock",
+                label="Mock",
+                type="command",
+                options={
+                    "argv": [sys.executable, str(solver_script)],
+                    "edges_regex": r"#SEdges\s+(\d+)",
+                    "time_regex": r"AnalysisTime\s+([\d.]+)",
+                },
+            )
+        ],
+        out_dir=tmp_path / "results",
+        rounds=1,
+        timeout_sec=10,
+        index_base="one",
+        force=False,
+    )
+
+    raw = (tmp_path / "results" / "raw_results.csv").read_text(encoding="utf-8")
+    assert "failed" in raw
+    assert "Solver exited with non-zero code; returncode=2" in raw
+    assert (tmp_path / "results" / "logs" / "line" / "mock" / "1.stdout.txt").read_text(
+        encoding="utf-8"
+    ) == "failure stdout\n"
+    assert "failure stderr" in (
+        tmp_path / "results" / "logs" / "line" / "mock" / "1.stderr.txt"
+    ).read_text(encoding="utf-8")
