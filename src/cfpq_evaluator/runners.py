@@ -23,6 +23,9 @@ class RunResult:
 
 
 class SolverError(Exception):
+    status = "failed"
+    error_kind = "solver_error"
+
     def __init__(
         self,
         message: str,
@@ -31,14 +34,14 @@ class SolverError(Exception):
         returncode: Optional[int] = None,
         stdout: str = "",
         stderr: str = "",
-        error_kind: str = "solver_error",
+        error_kind: Optional[str] = None,
     ):
         super().__init__(message)
         self.command = command
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
-        self.error_kind = error_kind
+        self.error_kind = error_kind or self.error_kind
 
     def summary(self) -> str:
         if self.returncode is None:
@@ -47,15 +50,18 @@ class SolverError(Exception):
 
 
 class TimeoutSolverError(SolverError):
-    pass
+    status = "timeout"
+    error_kind = "timeout"
 
 
 class IncompatibleSolverError(SolverError):
-    pass
+    status = "incompatible"
+    error_kind = "incompatible"
 
 
 class OutOfMemorySolverError(SolverError):
-    pass
+    status = "oom"
+    error_kind = "oom"
 
 
 def run_solver(

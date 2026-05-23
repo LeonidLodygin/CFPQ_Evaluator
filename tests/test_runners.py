@@ -9,11 +9,24 @@ from cfpq_evaluator.runners import (
     OutOfMemorySolverError,
     RunResult,
     SolverError,
+    TimeoutSolverError,
     is_oom,
     parse_required,
     rewritten_grammar_path,
     run_solver,
 )
+
+
+def test_solver_error_subclasses_define_result_statuses():
+    assert SolverError("failed").status == "failed"
+    assert SolverError("failed").error_kind == "solver_error"
+    assert TimeoutSolverError("too slow").status == "timeout"
+    assert TimeoutSolverError("too slow").error_kind == "timeout"
+    assert IncompatibleSolverError("unsupported").status == "incompatible"
+    assert IncompatibleSolverError("unsupported").error_kind == "incompatible"
+    assert OutOfMemorySolverError("oom").status == "oom"
+    assert OutOfMemorySolverError("oom").error_kind == "oom"
+    assert IncompatibleSolverError("parse", error_kind="parse_failed").error_kind == "parse_failed"
 
 
 def test_rewritten_grammar_path_prefers_existing_rewritten_file(tmp_path: Path):
