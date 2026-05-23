@@ -6,13 +6,7 @@ from typing import Callable, List, Optional
 from .config import Dataset, Solver, solver_uses_placeholder
 from .graphs import prepare_graph
 from .reporting import append_raw_row, completed_rounds, write_summary
-from .runners import (
-    IncompatibleSolverError,
-    OutOfMemorySolverError,
-    SolverError,
-    TimeoutSolverError,
-    run_solver,
-)
+from .runners import SolverError, run_solver
 
 ProgressReporter = Callable[[str], None]
 
@@ -104,27 +98,15 @@ def run_experiments(
                                 "ram_kb": result.ram_kb,
                             }
                         )
-                    except TimeoutSolverError as exc:
-                        record_error(
-                            logs_root, dataset.name, solver.id, round_number, row, "timeout", exc
-                        )
-                    except IncompatibleSolverError as exc:
+                    except SolverError as exc:
                         record_error(
                             logs_root,
                             dataset.name,
                             solver.id,
                             round_number,
                             row,
-                            "incompatible",
+                            exc.status,
                             exc,
-                        )
-                    except OutOfMemorySolverError as exc:
-                        record_error(
-                            logs_root, dataset.name, solver.id, round_number, row, "oom", exc
-                        )
-                    except SolverError as exc:
-                        record_error(
-                            logs_root, dataset.name, solver.id, round_number, row, "failed", exc
                         )
                     append_raw_row(raw_path, row)
                     report(
