@@ -12,6 +12,16 @@ from cfpq_evaluator.config import (
 )
 
 
+def make_dataset_bundle(tmp_path: Path, *grammar_files: str) -> Path:
+    dataset_root = tmp_path / "datasets" / "case"
+    (dataset_root / "graph").mkdir(parents=True)
+    grammar_dir = dataset_root / "grammar"
+    grammar_dir.mkdir()
+    for grammar_file in grammar_files:
+        (grammar_dir / grammar_file).write_text("S\ta\n\nCount:\nS\n", encoding="utf-8")
+    return dataset_root
+
+
 def test_load_datasets_resolves_paths_relative_to_csv(tmp_path: Path):
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
@@ -55,11 +65,7 @@ def test_load_datasets_supports_self_contained_dataset_directory(tmp_path: Path)
 
 
 def test_load_datasets_supports_grammar_file_column(tmp_path: Path):
-    dataset_root = tmp_path / "datasets" / "case"
-    (dataset_root / "graph").mkdir(parents=True)
-    (dataset_root / "grammar").mkdir()
-    (dataset_root / "grammar" / "aa.cnf").write_text("", encoding="utf-8")
-    (dataset_root / "grammar" / "vf.cnf").write_text("", encoding="utf-8")
+    dataset_root = make_dataset_bundle(tmp_path, "aa.cnf", "vf.cnf")
     datasets_csv = tmp_path / "datasets.csv"
     datasets_csv.write_text(
         "name,dataset,grammar_file\ncase,datasets/case,vf.cnf\n", encoding="utf-8"
