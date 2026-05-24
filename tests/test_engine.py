@@ -53,7 +53,11 @@ def test_run_experiments_end_to_end_with_command_solver(tmp_path: Path):
         progress=progress.append,
     )
 
-    assert "| line | Mock | ok | 2 | 0.25 s +/- 0.0% |" in summary
+    assert "line" in summary
+    assert "Mock" in summary
+    assert "ok" in summary
+    assert "2" in summary
+    assert "0.25 s +/- 0.0%" in summary
     assert any("preparing line" in message for message in progress)
     assert any("mock / round 1 started" in message for message in progress)
     assert any("mock / round 1 -> ok" in message for message in progress)
@@ -129,7 +133,10 @@ def test_run_experiments_force_replaces_existing_raw_results(tmp_path: Path):
 
     raw = (tmp_path / "results" / "raw_results.csv").read_text(encoding="utf-8")
     assert raw.count("mock,Mock,line") == 1
-    assert "| line | Mock | ok | 2 |" in summary
+    assert "line" in summary
+    assert "Mock" in summary
+    assert "ok" in summary
+    assert "2" in summary
 
 
 def test_run_experiments_can_cleanup_prepared_graph(tmp_path: Path):

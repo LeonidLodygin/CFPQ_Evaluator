@@ -7,6 +7,8 @@ from pathlib import Path
 from statistics import mean, stdev
 from typing import Dict, Iterable, List
 
+from tabulate import tabulate
+
 RAW_HEADER = [
     "solver_id",
     "solver_label",
@@ -120,10 +122,4 @@ def format_metric(values: List[float], unit: str) -> str:
 
 
 def markdown_table(headers: List[str], rows: List[List[str]]) -> str:
-    table = [
-        "| " + " | ".join(headers) + " |",
-        "| " + " | ".join("---" for _ in headers) + " |",
-    ]
-    for row in rows:
-        table.append("| " + " | ".join(str(cell) for cell in row) + " |")
-    return "\n".join(table)
+    return tabulate(rows, headers=headers, tablefmt="github")
