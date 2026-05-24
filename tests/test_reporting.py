@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 
 from cfpq_evaluator.reporting import (
+    RawResultRow,
     append_raw_row,
     completed_rounds,
     format_metric,
@@ -10,12 +11,38 @@ from cfpq_evaluator.reporting import (
 )
 
 
+def raw_row(
+    solver_id: str = "s",
+    solver_label: str = "Solver",
+    dataset: str = "d",
+    round: str = "1",
+    status: str = "ok",
+    answer_edges: str = "",
+    time_sec: str = "",
+    ram_kb: str = "",
+    message: str = "",
+) -> RawResultRow:
+    return RawResultRow(
+        solver_id=solver_id,
+        solver_label=solver_label,
+        dataset=dataset,
+        graph_dir="/graph",
+        grammar="/grammar.cnf",
+        round=round,
+        status=status,
+        answer_edges=answer_edges,
+        time_sec=time_sec,
+        ram_kb=ram_kb,
+        message=message,
+    )
+
+
 def test_append_raw_row_writes_header_and_completed_rounds(tmp_path: Path):
     raw = tmp_path / "raw.csv"
 
-    append_raw_row(raw, {"solver_id": "s", "dataset": "d", "round": "1", "status": "ok"})
-    append_raw_row(raw, {"solver_id": "s", "dataset": "d", "round": "2", "status": "ok"})
-    append_raw_row(raw, {"solver_id": "other", "dataset": "d", "round": "1", "status": "ok"})
+    append_raw_row(raw, raw_row(round="1"))
+    append_raw_row(raw, raw_row(round="2"))
+    append_raw_row(raw, raw_row(solver_id="other", round="1"))
 
     with raw.open(newline="", encoding="utf-8") as file:
         rows = list(csv.DictReader(file))
@@ -28,39 +55,9 @@ def test_append_raw_row_writes_header_and_completed_rounds(tmp_path: Path):
 
 def test_write_summary_aggregates_successes_and_reports_failures(tmp_path: Path):
     raw = tmp_path / "raw.csv"
-    append_raw_row(
-        raw,
-        {
-            "solver_id": "s",
-            "solver_label": "Solver",
-            "dataset": "d",
-            "status": "ok",
-            "answer_edges": "10",
-            "time_sec": "1.0",
-            "ram_kb": "100",
-        },
-    )
-    append_raw_row(
-        raw,
-        {
-            "solver_id": "s",
-            "solver_label": "Solver",
-            "dataset": "d",
-            "status": "ok",
-            "answer_edges": "10",
-            "time_sec": "3.0",
-            "ram_kb": "300",
-        },
-    )
-    append_raw_row(
-        raw,
-        {
-            "solver_id": "bad",
-            "solver_label": "Bad Solver",
-            "dataset": "d",
-            "status": "failed",
-        },
-    )
+    append_raw_row(raw, raw_row(answer_edges="10", time_sec="1.0", ram_kb="100"))
+    append_raw_row(raw, raw_row(round="2", answer_edges="10", time_sec="3.0", ram_kb="300"))
+    append_raw_row(raw, raw_row(solver_id="bad", solver_label="Bad Solver", status="failed"))
 
     summary = write_summary(raw, tmp_path / "summary.md")
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import mean, stdev
 from typing import Dict, Iterable, List
@@ -21,14 +22,33 @@ RAW_HEADER = [
 ]
 
 
-def append_raw_row(path: Path, row: Dict[str, str]) -> None:
+@dataclass
+class RawResultRow:
+    solver_id: str
+    solver_label: str
+    dataset: str
+    graph_dir: str
+    grammar: str
+    round: str
+    status: str = ""
+    answer_edges: str = ""
+    time_sec: str = ""
+    ram_kb: str = ""
+    message: str = ""
+
+    def to_csv_row(self) -> Dict[str, str]:
+        data = asdict(self)
+        return {key: str(data.get(key, "")) for key in RAW_HEADER}
+
+
+def append_raw_row(path: Path, row: RawResultRow) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
     with path.open("a", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=RAW_HEADER)
         if not exists:
             writer.writeheader()
-        writer.writerow({key: row.get(key, "") for key in RAW_HEADER})
+        writer.writerow(row.to_csv_row())
 
 
 def completed_rounds(path: Path, solver_id: str, dataset: str) -> int:

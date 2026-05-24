@@ -6,7 +6,7 @@ from typing import Callable, List, Optional
 
 from .config import Dataset, Solver, solver_uses_placeholder
 from .graphs import prepare_graph
-from .reporting import append_raw_row, completed_rounds, write_summary
+from .reporting import RawResultRow, append_raw_row, completed_rounds, write_summary
 from .runners import RunStatus, SolverError, run_solver
 
 ProgressReporter = Callable[[str], None]
@@ -105,14 +105,14 @@ def run_experiments(
                     run_work = layout.solver_work_dir(dataset.name, solver.id, round_number)
                     if solver_uses_placeholder(solver, "work"):
                         run_work.mkdir(parents=True, exist_ok=True)
-                    row = {
-                        "solver_id": solver.id,
-                        "solver_label": solver.label,
-                        "dataset": dataset.name,
-                        "graph_dir": str(dataset.graph),
-                        "grammar": str(dataset.grammar),
-                        "round": str(round_number),
-                    }
+                    row = RawResultRow(
+                        solver_id=solver.id,
+                        solver_label=solver.label,
+                        dataset=dataset.name,
+                        graph_dir=str(dataset.graph),
+                        grammar=str(dataset.grammar),
+                        round=str(round_number),
+                    )
                     try:
                         result = run_solver(
                             solver=solver,
@@ -130,14 +130,10 @@ def run_experiments(
                             result.stdout,
                             result.stderr,
                         )
-                        row.update(
-                            {
-                                "status": RunStatus.OK.value,
-                                "answer_edges": result.answer_edges,
-                                "time_sec": result.time_sec,
-                                "ram_kb": result.ram_kb,
-                            }
-                        )
+                        row.status = RunStatus.OK.value
+                        row.answer_edges = result.answer_edges
+                        row.time_sec = result.time_sec
+                        row.ram_kb = result.ram_kb
                     except SolverError as exc:
                         record_error(
                             layout,
@@ -152,7 +148,7 @@ def run_experiments(
                     report(
                         progress,
                         f"[run {run_index}/{total_runs}] {dataset.name} / "
-                        f"{solver.id} / round {round_number} -> {row['status']}",
+                        f"{solver.id} / round {round_number} -> {row.status}",
                     )
         finally:
             # Cleanup happens after all solvers have consumed this dataset.
@@ -171,12 +167,13 @@ def record_error(
     dataset_name: str,
     solver_id: str,
     round_number: int,
-    row: dict[str, str],
+    row: RawResultRow,
     status: RunStatus,
     exc: SolverError,
 ) -> None:
     write_log(layout, dataset_name, solver_id, round_number, exc.stdout, exc.stderr)
-    row.update({"status": status.value, "message": exc.summary()})
+    row.status = status.value
+    row.message = exc.summary()
 
 
 def report(progress: Optional[ProgressReporter], message: str) -> None:
