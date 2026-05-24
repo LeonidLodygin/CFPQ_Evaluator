@@ -56,6 +56,18 @@ class OutputLayout:
         self.summary.unlink(missing_ok=True)
 
 
+@dataclass(frozen=True)
+class ExperimentContext:
+    layout: OutputLayout
+    rounds: int
+    timeout_sec: Optional[int]
+    index_base: str
+    force: bool
+    cleanup_prepared: bool
+    progress: Optional[ProgressReporter]
+    total_runs: int
+
+
 def run_experiments(
     datasets: List[Dataset],
     solvers: List[Solver],
@@ -71,22 +83,19 @@ def run_experiments(
     if force:
         layout.reset_run_outputs()
 
-    total_runs = len(datasets) * len(solvers) * rounds
+    context = ExperimentContext(
+        layout=layout,
+        rounds=rounds,
+        timeout_sec=timeout_sec,
+        index_base=index_base,
+        force=force,
+        cleanup_prepared=cleanup_prepared,
+        progress=progress,
+        total_runs=len(datasets) * len(solvers) * rounds,
+    )
     run_index = 0
     for dataset in datasets:
-        run_index = run_dataset(
-            dataset=dataset,
-            solvers=solvers,
-            layout=layout,
-            rounds=rounds,
-            timeout_sec=timeout_sec,
-            index_base=index_base,
-            force=force,
-            cleanup_prepared=cleanup_prepared,
-            progress=progress,
-            run_index=run_index,
-            total_runs=total_runs,
-        )
+        run_index = run_dataset(dataset, solvers, context, run_index)
 
     return write_summary(layout.raw_results, layout.summary)
 
@@ -94,58 +103,51 @@ def run_experiments(
 def run_dataset(
     dataset: Dataset,
     solvers: List[Solver],
-    layout: OutputLayout,
-    rounds: int,
-    timeout_sec: Optional[int],
-    index_base: str,
-    force: bool,
-    cleanup_prepared: bool,
-    progress: Optional[ProgressReporter],
+    context: ExperimentContext,
     run_index: int,
-    total_runs: int,
 ) -> int:
-    prepared = prepare_dataset(dataset, layout, index_base, progress)
+    prepared = prepare_dataset(dataset, context)
     try:
         # A prepared graph is shared by every solver for this dataset, then
         # optionally removed before moving to the next dataset.
         for solver in solvers:
-            done = 0 if force else completed_rounds(layout.raw_results, solver.id, dataset.name)
+            done = completed_rounds_for_solver(context, solver, dataset)
             # Without --force, completed rounds are skipped so interrupted
             # experiments can resume from raw_results.csv.
-            for round_number in range(done + 1, rounds + 1):
+            for round_number in range(done + 1, context.rounds + 1):
                 run_index += 1
                 run_solver_round(
                     dataset=dataset,
                     solver=solver,
                     prepared=prepared,
-                    layout=layout,
+                    context=context,
                     round_number=round_number,
-                    timeout_sec=timeout_sec,
-                    progress=progress,
                     run_index=run_index,
-                    total_runs=total_runs,
                 )
     finally:
-        if cleanup_prepared:
+        if context.cleanup_prepared:
             cleanup_prepared_graph(prepared)
     return run_index
 
 
-def prepare_dataset(
-    dataset: Dataset,
-    layout: OutputLayout,
-    index_base: str,
-    progress: Optional[ProgressReporter],
-) -> PreparedGraph:
-    report(progress, f"[dataset] preparing {dataset.name}")
+def completed_rounds_for_solver(
+    context: ExperimentContext, solver: Solver, dataset: Dataset
+) -> int:
+    if context.force:
+        return 0
+    return completed_rounds(context.layout.raw_results, solver.id, dataset.name)
+
+
+def prepare_dataset(dataset: Dataset, context: ExperimentContext) -> PreparedGraph:
+    report(context.progress, f"[dataset] preparing {dataset.name}")
     prepared = prepare_graph(
         dataset.graph,
-        layout.graph_work_dir(dataset.name),
-        index_base=index_base,
+        context.layout.graph_work_dir(dataset.name),
+        index_base=context.index_base,
         grammar_path=dataset.grammar,
     )
     report(
-        progress,
+        context.progress,
         f"[dataset] prepared {dataset.name}: "
         f"{prepared.vertex_count} vertices, {prepared.edge_count} edges, "
         f"{prepared.label_count} labels",
@@ -157,19 +159,16 @@ def run_solver_round(
     dataset: Dataset,
     solver: Solver,
     prepared: PreparedGraph,
-    layout: OutputLayout,
+    context: ExperimentContext,
     round_number: int,
-    timeout_sec: Optional[int],
-    progress: Optional[ProgressReporter],
     run_index: int,
-    total_runs: int,
 ) -> None:
     report(
-        progress,
-        f"[run {run_index}/{total_runs}] {dataset.name} / {solver.id} / "
+        context.progress,
+        f"[run {run_index}/{context.total_runs}] {dataset.name} / {solver.id} / "
         f"round {round_number} started",
     )
-    run_work = layout.solver_work_dir(dataset.name, solver.id, round_number)
+    run_work = context.layout.solver_work_dir(dataset.name, solver.id, round_number)
     if solver_uses_placeholder(solver, "work"):
         run_work.mkdir(parents=True, exist_ok=True)
 
@@ -180,18 +179,20 @@ def run_solver_round(
             graph_path=prepared.pocr_path,
             graph_dir=dataset.graph,
             grammar_path=dataset.grammar,
-            timeout_sec=timeout_sec,
+            timeout_sec=context.timeout_sec,
             work_dir=run_work,
         )
-        write_log(layout, dataset.name, solver.id, round_number, result.stdout, result.stderr)
+        write_log(
+            context.layout, dataset.name, solver.id, round_number, result.stdout, result.stderr
+        )
         apply_success(row, result)
     except SolverError as exc:
-        record_error(layout, dataset.name, solver.id, round_number, row, exc.status, exc)
+        record_error(context.layout, dataset.name, solver.id, round_number, row, exc.status, exc)
 
-    append_raw_row(layout.raw_results, row)
+    append_raw_row(context.layout.raw_results, row)
     report(
-        progress,
-        f"[run {run_index}/{total_runs}] {dataset.name} / {solver.id} / "
+        context.progress,
+        f"[run {run_index}/{context.total_runs}] {dataset.name} / {solver.id} / "
         f"round {round_number} -> {row.status}",
     )
 
