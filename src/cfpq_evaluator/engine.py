@@ -6,7 +6,7 @@ from typing import Callable, List, Optional
 from .config import Dataset, Solver, solver_uses_placeholder
 from .graphs import prepare_graph
 from .reporting import append_raw_row, completed_rounds, write_summary
-from .runners import SolverError, run_solver
+from .runners import RunStatus, SolverError, run_solver
 
 ProgressReporter = Callable[[str], None]
 
@@ -92,7 +92,7 @@ def run_experiments(
                         )
                         row.update(
                             {
-                                "status": "ok",
+                                "status": RunStatus.OK.value,
                                 "answer_edges": result.answer_edges,
                                 "time_sec": result.time_sec,
                                 "ram_kb": result.ram_kb,
@@ -132,11 +132,11 @@ def record_error(
     solver_id: str,
     round_number: int,
     row: dict[str, str],
-    status: str,
+    status: RunStatus,
     exc: SolverError,
 ) -> None:
     write_log(logs_root, dataset_name, solver_id, round_number, exc.stdout, exc.stderr)
-    row.update({"status": status, "message": exc.summary()})
+    row.update({"status": status.value, "message": exc.summary()})
 
 
 def report(progress: Optional[ProgressReporter], message: str) -> None:

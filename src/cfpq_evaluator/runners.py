@@ -7,10 +7,19 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from .config import Solver
+
+
+class RunStatus(str, Enum):
+    OK = "ok"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+    OOM = "oom"
+    INCOMPATIBLE = "incompatible"
 
 
 @dataclass(frozen=True)
@@ -23,7 +32,7 @@ class RunResult:
 
 
 class SolverError(Exception):
-    status = "failed"
+    status = RunStatus.FAILED
 
     def __init__(
         self,
@@ -47,15 +56,15 @@ class SolverError(Exception):
 
 
 class TimeoutSolverError(SolverError):
-    status = "timeout"
+    status = RunStatus.TIMEOUT
 
 
 class IncompatibleSolverError(SolverError):
-    status = "incompatible"
+    status = RunStatus.INCOMPATIBLE
 
 
 class OutOfMemorySolverError(SolverError):
-    status = "oom"
+    status = RunStatus.OOM
 
 
 def run_solver(

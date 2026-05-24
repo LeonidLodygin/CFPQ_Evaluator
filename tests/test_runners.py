@@ -8,6 +8,7 @@ from cfpq_evaluator.runners import (
     IncompatibleSolverError,
     OutOfMemorySolverError,
     RunResult,
+    RunStatus,
     SolverError,
     TimeoutSolverError,
     is_oom,
@@ -18,10 +19,10 @@ from cfpq_evaluator.runners import (
 
 
 def test_solver_error_subclasses_define_result_statuses():
-    assert SolverError("failed").status == "failed"
-    assert TimeoutSolverError("too slow").status == "timeout"
-    assert IncompatibleSolverError("unsupported").status == "incompatible"
-    assert OutOfMemorySolverError("oom").status == "oom"
+    assert SolverError("failed").status is RunStatus.FAILED
+    assert TimeoutSolverError("too slow").status is RunStatus.TIMEOUT
+    assert IncompatibleSolverError("unsupported").status is RunStatus.INCOMPATIBLE
+    assert OutOfMemorySolverError("oom").status is RunStatus.OOM
 
 
 def test_rewritten_grammar_path_prefers_existing_rewritten_file(tmp_path: Path):
