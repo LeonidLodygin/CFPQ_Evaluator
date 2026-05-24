@@ -139,6 +139,32 @@ def test_process_runner_records_nonzero_exit_details(monkeypatch):
     assert exc.summary() == "Solver exited with non-zero code; returncode=2"
 
 
+def test_process_runner_removes_time_file_after_failed_process(monkeypatch, tmp_path: Path):
+    class Process:
+        returncode = 2
+        stdout = "solver stdout"
+        stderr = "solver stderr"
+
+    def fake_run(command, **kwargs):
+        time_index = command.index("-o") + 1
+        Path(command[time_index]).write_text("EVAL_PEAK_RSS_KB=42\n", encoding="utf-8")
+        return Process()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(SolverError):
+        CommandRunner(
+            Solver(
+                id="mock",
+                label="Mock",
+                type="command",
+                options={"argv": ["tool"], "edges_regex": "x", "time_regex": "y"},
+            )
+        ).run_process(["tool"], cwd=tmp_path, timeout_sec=None)
+
+    assert not (tmp_path / ".cfpq_eval_time.txt").exists()
+
+
 def test_command_runner_substitutes_placeholders_and_parses_output(monkeypatch, tmp_path: Path):
     captured = {}
 

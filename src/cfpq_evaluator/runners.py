@@ -84,7 +84,7 @@ class ProcessRunner:
         # Wrap external solvers with /usr/bin/time when available to collect
         # peak RSS without forcing every adapter to implement memory tracking.
         if shutil.which("/usr/bin/time") or Path("/usr/bin/time").exists():
-            time_file = Path(cwd or Path.cwd()) / ".cfpq_orch_time.txt"
+            time_file = Path(cwd or Path.cwd()) / ".cfpq_eval_time.txt"
             measured_command = [
                 "/usr/bin/time",
                 "-f",
@@ -106,47 +106,43 @@ class ProcessRunner:
                 timeout=timeout_sec,
                 check=False,
             )
+            elapsed = time.monotonic() - started
+
+            # Docker/Linux OOM kills and JVM/native allocation failures surface in
+            # different ways, so classify them before generic non-zero failures.
+            if is_oom(process.returncode, process.stdout, process.stderr):
+                raise OutOfMemorySolverError(
+                    "Solver was killed by OOM or memory allocation failure",
+                    command=command,
+                    returncode=process.returncode,
+                    stdout=process.stdout,
+                    stderr=process.stderr,
+                )
+
+            if process.returncode != 0:
+                raise SolverError(
+                    "Solver exited with non-zero code",
+                    command=command,
+                    returncode=process.returncode,
+                    stdout=process.stdout,
+                    stderr=process.stderr,
+                )
+
+            return RunResult(
+                answer_edges="",
+                time_sec=f"{elapsed:.6f}",
+                ram_kb=read_peak_rss(time_file),
+                stdout=process.stdout,
+                stderr=process.stderr,
+            )
         except subprocess.TimeoutExpired as exc:
             raise TimeoutSolverError(
                 f"Solver timed out after {timeout_sec} seconds",
                 command=command,
             ) from exc
-        elapsed = time.monotonic() - started
-
-        # Docker/Linux OOM kills and JVM/native allocation failures surface in
-        # different ways, so classify them before generic non-zero failures.
-        if is_oom(process.returncode, process.stdout, process.stderr):
-            raise OutOfMemorySolverError(
-                "Solver was killed by OOM or memory allocation failure",
-                command=command,
-                returncode=process.returncode,
-                stdout=process.stdout,
-                stderr=process.stderr,
-            )
-
-        if process.returncode != 0:
-            raise SolverError(
-                "Solver exited with non-zero code",
-                command=command,
-                returncode=process.returncode,
-                stdout=process.stdout,
-                stderr=process.stderr,
-            )
-
-        ram_kb = ""
-        if time_file and time_file.exists():
-            match = re.search(r"EVAL_PEAK_RSS_KB=(\d+)", time_file.read_text(encoding="utf-8"))
-            if match:
-                ram_kb = match.group(1)
-            time_file.unlink(missing_ok=True)
-
-        return RunResult(
-            answer_edges="",
-            time_sec=f"{elapsed:.6f}",
-            ram_kb=ram_kb,
-            stdout=process.stdout,
-            stderr=process.stderr,
-        )
+        finally:
+            if time_file:
+                time_file.unlink(missing_ok=True)
 
 
 class CommandRunner(ProcessRunner):
@@ -206,6 +202,13 @@ class CommandRunner(ProcessRunner):
             stdout=raw.stdout,
             stderr=raw.stderr,
         )
+
+
+def read_peak_rss(time_file: Optional[Path]) -> str:
+    if not time_file or not time_file.exists():
+        return ""
+    match = re.search(r"EVAL_PEAK_RSS_KB=(\d+)", time_file.read_text(encoding="utf-8"))
+    return match.group(1) if match else ""
 
 
 def rewritten_grammar_path(grammar_path: Path) -> Path:
