@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
@@ -9,6 +10,50 @@ from .reporting import append_raw_row, completed_rounds, write_summary
 from .runners import RunStatus, SolverError, run_solver
 
 ProgressReporter = Callable[[str], None]
+
+
+@dataclass(frozen=True)
+class OutputLayout:
+    root: Path
+
+    @classmethod
+    def create(cls, out_dir: Path) -> "OutputLayout":
+        root = out_dir.resolve()
+        root.mkdir(parents=True, exist_ok=True)
+        return cls(root)
+
+    @property
+    def raw_results(self) -> Path:
+        return self.root / "raw_results.csv"
+
+    @property
+    def summary(self) -> Path:
+        return self.root / "summary.md"
+
+    @property
+    def prepared_graphs(self) -> Path:
+        return self.root / "prepared_graphs"
+
+    @property
+    def logs(self) -> Path:
+        return self.root / "logs"
+
+    @property
+    def work(self) -> Path:
+        return self.root / "work"
+
+    def graph_work_dir(self, dataset_name: str) -> Path:
+        return self.prepared_graphs / dataset_name
+
+    def solver_work_dir(self, dataset_name: str, solver_id: str, round_number: int) -> Path:
+        return self.work / dataset_name / solver_id / str(round_number)
+
+    def log_dir(self, dataset_name: str, solver_id: str) -> Path:
+        return self.logs / dataset_name / solver_id
+
+    def reset_run_outputs(self) -> None:
+        self.raw_results.unlink(missing_ok=True)
+        self.summary.unlink(missing_ok=True)
 
 
 def run_experiments(
@@ -22,20 +67,15 @@ def run_experiments(
     cleanup_prepared: bool = False,
     progress: Optional[ProgressReporter] = None,
 ) -> str:
-    out_dir = out_dir.resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    raw_path = out_dir / "raw_results.csv"
+    layout = OutputLayout.create(out_dir)
     if force:
-        raw_path.unlink(missing_ok=True)
-        (out_dir / "summary.md").unlink(missing_ok=True)
-    prepared_root = out_dir / "prepared_graphs"
-    logs_root = out_dir / "logs"
+        layout.reset_run_outputs()
     total_runs = len(datasets) * len(solvers) * rounds
     run_index = 0
 
     for dataset in datasets:
         report(progress, f"[dataset] preparing {dataset.name}")
-        graph_work = prepared_root / dataset.name
+        graph_work = layout.graph_work_dir(dataset.name)
         prepared = prepare_graph(
             dataset.graph,
             graph_work,
@@ -52,7 +92,7 @@ def run_experiments(
             # A prepared graph is shared by every solver for this dataset, then
             # optionally removed before moving to the next dataset.
             for solver in solvers:
-                done = 0 if force else completed_rounds(raw_path, solver.id, dataset.name)
+                done = 0 if force else completed_rounds(layout.raw_results, solver.id, dataset.name)
                 # Without --force, completed rounds are skipped so interrupted
                 # experiments can resume from raw_results.csv.
                 for round_number in range(done + 1, rounds + 1):
@@ -62,7 +102,7 @@ def run_experiments(
                         f"[run {run_index}/{total_runs}] {dataset.name} / "
                         f"{solver.id} / round {round_number} started",
                     )
-                    run_work = out_dir / "work" / dataset.name / solver.id / str(round_number)
+                    run_work = layout.solver_work_dir(dataset.name, solver.id, round_number)
                     if solver_uses_placeholder(solver, "work"):
                         run_work.mkdir(parents=True, exist_ok=True)
                     row = {
@@ -83,7 +123,7 @@ def run_experiments(
                             work_dir=run_work,
                         )
                         write_log(
-                            logs_root,
+                            layout,
                             dataset.name,
                             solver.id,
                             round_number,
@@ -100,7 +140,7 @@ def run_experiments(
                         )
                     except SolverError as exc:
                         record_error(
-                            logs_root,
+                            layout,
                             dataset.name,
                             solver.id,
                             round_number,
@@ -108,7 +148,7 @@ def run_experiments(
                             exc.status,
                             exc,
                         )
-                    append_raw_row(raw_path, row)
+                    append_raw_row(layout.raw_results, row)
                     report(
                         progress,
                         f"[run {run_index}/{total_runs}] {dataset.name} / "
@@ -123,11 +163,11 @@ def run_experiments(
                 except OSError:
                     pass
 
-    return write_summary(raw_path, out_dir / "summary.md")
+    return write_summary(layout.raw_results, layout.summary)
 
 
 def record_error(
-    logs_root: Path,
+    layout: OutputLayout,
     dataset_name: str,
     solver_id: str,
     round_number: int,
@@ -135,7 +175,7 @@ def record_error(
     status: RunStatus,
     exc: SolverError,
 ) -> None:
-    write_log(logs_root, dataset_name, solver_id, round_number, exc.stdout, exc.stderr)
+    write_log(layout, dataset_name, solver_id, round_number, exc.stdout, exc.stderr)
     row.update({"status": status.value, "message": exc.summary()})
 
 
@@ -145,14 +185,14 @@ def report(progress: Optional[ProgressReporter], message: str) -> None:
 
 
 def write_log(
-    logs_root: Path,
+    layout: OutputLayout,
     dataset_name: str,
     solver_id: str,
     round_number: int,
     stdout: str,
     stderr: str,
 ) -> None:
-    log_dir = logs_root / dataset_name / solver_id
+    log_dir = layout.log_dir(dataset_name, solver_id)
     log_dir.mkdir(parents=True, exist_ok=True)
     (log_dir / f"{round_number}.stdout.txt").write_text(stdout, encoding="utf-8")
     (log_dir / f"{round_number}.stderr.txt").write_text(stderr, encoding="utf-8")
