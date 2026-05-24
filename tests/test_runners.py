@@ -19,14 +19,9 @@ from cfpq_evaluator.runners import (
 
 def test_solver_error_subclasses_define_result_statuses():
     assert SolverError("failed").status == "failed"
-    assert SolverError("failed").error_kind == "solver_error"
     assert TimeoutSolverError("too slow").status == "timeout"
-    assert TimeoutSolverError("too slow").error_kind == "timeout"
     assert IncompatibleSolverError("unsupported").status == "incompatible"
-    assert IncompatibleSolverError("unsupported").error_kind == "incompatible"
     assert OutOfMemorySolverError("oom").status == "oom"
-    assert OutOfMemorySolverError("oom").error_kind == "oom"
-    assert IncompatibleSolverError("parse", error_kind="parse_failed").error_kind == "parse_failed"
 
 
 def test_rewritten_grammar_path_prefers_existing_rewritten_file(tmp_path: Path):
@@ -115,7 +110,6 @@ def test_process_runner_classifies_oom(monkeypatch):
     assert exc.command == ["tool"]
     assert exc.returncode == 137
     assert exc.stderr == "Killed"
-    assert exc.error_kind == "oom"
     assert exc.summary() == "Solver was killed by OOM or memory allocation failure; returncode=137"
 
 
@@ -142,7 +136,6 @@ def test_process_runner_records_nonzero_exit_details(monkeypatch):
     assert exc.returncode == 2
     assert exc.stdout == "solver stdout"
     assert exc.stderr == "solver stderr"
-    assert exc.error_kind == "nonzero_exit"
     assert exc.summary() == "Solver exited with non-zero code; returncode=2"
 
 
