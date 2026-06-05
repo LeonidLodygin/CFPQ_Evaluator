@@ -146,7 +146,7 @@ aa-xz,/data/datasets/aa-xz,aa.cnf
 
 ## Solver Config
 
-Solvers are TOML files. Every solver is configured as an external command:
+Solvers are represented as TOML files. Every solver is configured as an external command:
 
 ```toml
 [[solver]]
@@ -163,61 +163,138 @@ Available placeholders: `{graph}`, `{graph_dir}`, `{graph_mtx_dir}`,
 over a single `command` string when paths may contain spaces. A shell-like
 `command = "..."` string is also supported for simple cases.
 
-## Example: CFPQ_PyAlgo
+# Adding Your Own Solver
 
-`CFPQ Evaluator` does not import CFPQ_PyAlgo directly. If CFPQ_PyAlgo is
-installed or cloned locally, describe it as an external command solver:
+`CFPQ_Evaluator` runs solvers as external commands.
+
+The evaluator itself does not require a solver-specific Python API. It starts the command from `argv`, captures its output, and extracts the answer size and time using regular expressions.
+
+### 1. Choose How the Solver Is Started
+
+First write the command that starts your solver manually.
+
+Examples:
+
+```bash
+/path/to/my-solver --graph graph.g --grammar grammar.cnf
+```
+
+```bash
+python3 -m my_solver.run --graph graph.g --grammar grammar.cnf
+```
+
+If the solver needs input conversion or special handling, wrap it in an adapter and run the adapter instead.
+
+### 2. Add the Solver to TOML
+
+Create or update `solvers.toml`:
 
 ```toml
 [[solver]]
-id = "pyalgo-incremental"
-label = "CFPQ PyAlgo incremental"
+id = "my-solver"
+label = "My Solver"
 type = "command"
-cwd = "/path/to/CFPQ_PyAlgo"
 argv = [
   "python3",
   "-m",
-  "cfpq_cli.run_all_pairs_cflr",
-  "IncrementalAllPairsCFLReachabilityMatrix",
+  "my_solver.run",
+  "--graph",
   "{graph}",
-  "{grammar}",
+  "--grammar",
+  "{grammar}"
 ]
-edges_regex = "#(?:SEdges|CountEdges)\\s+(\\d+)"
-time_regex = "AnalysisTime\\s+([\\d.]+)"
-
-[[solver]]
-id = "pyalgo-nonincremental"
-label = "CFPQ PyAlgo nonincremental"
-type = "command"
-cwd = "/path/to/CFPQ_PyAlgo"
-argv = [
-  "python3",
-  "-m",
-  "cfpq_cli.run_all_pairs_cflr",
-  "NonIncrementalAllPairsCFLReachabilityMatrix",
-  "{graph}",
-  "{grammar}",
-]
-edges_regex = "#(?:SEdges|CountEdges)\\s+(\\d+)"
-time_regex = "AnalysisTime\\s+([\\d.]+)"
+edges_regex = "ANSWER\\s+(\\d+)"
+time_regex = "TIME\\s+([\\d.]+)"
 ```
 
-Run it with your dataset config:
+`argv` is the command split into separate arguments. The first item is the executable command, and the following items are its arguments.
+
+For example, this shell command:
 
 ```bash
-cfpq-eval run \
-  --datasets /path/to/datasets.csv \
-  --solvers /path/to/pyalgo-solvers.toml \
-  --out results_pyalgo \
-  --rounds 1 \
-  --timeout 60 \
-  --mtx-base zero
+python3 -m my_solver.run --graph graph.g --grammar grammar.cnf --timeout 60
 ```
 
-The evaluator prepares the Matrix Market graph directory into a temporary `.g`
-file and passes that file to CFPQ_PyAlgo through `{graph}`. Use
-`--mtx-base zero` when the `.mtx` coordinates are already zero-based; use
-`--mtx-base one` for standard one-based Matrix Market inputs.
+is written as:
+
+```toml
+argv = [
+  "python3",
+  "-m",
+  "my_solver.run",
+  "--graph",
+  "{graph}",
+  "--grammar",
+  "{grammar}",
+  "--timeout",
+  "{timeout}"
+]
+```
+
+Do not put the whole command into one string.
+
+Correct:
+
+```toml
+argv = ["python3", "-m", "my_solver.run", "--graph", "{graph}"]
+```
+
+Incorrect:
+
+```toml
+argv = ["python3 -m my_solver.run --graph {graph}"]
+```
+
+### 3. Useful Placeholders
+
+The evaluator substitutes placeholders before running the command.
+
+| Placeholder | Meaning |
+| --- | --- |
+| `{graph}` | Prepared graph path passed to the solver |
+| `{graph_dir}` | Prepared graph directory |
+| `{graph_mtx_dir}` | Directory with Matrix Market files |
+| `{grammar}` | Grammar file |
+| `{grammar_rewritten}` | Rewritten grammar file, if available |
+| `{work}` | Per-run temporary directory |
+| `{timeout}` | Timeout in seconds |
+
+Most solvers only need `{graph}`, `{grammar}`, and `{timeout}`.
+
+### 4. Parse Solver Output
+
+`edges_regex` extracts the number of answer pairs. `time_regex` extracts solver time.
+
+For this output:
+
+```text
+ANSWER 12345
+TIME 0.578
+```
+
+use:
+
+```toml
+edges_regex = "ANSWER\\s+(\\d+)"
+time_regex = "TIME\\s+([\\d.]+)"
+```
+
+If your solver prints another format, change the regexes accordingly.
+
+For example:
+
+```text
+Result pairs: 12345
+Elapsed: 0.578 sec
+```
+
+can be parsed with:
+
+```toml
+edges_regex = "Result pairs:\\s+(\\d+)"
+time_regex = "Elapsed:\\s+([\\d.]+)\\s+sec"
+```
+
 
 ## Run Real Experiments
 
