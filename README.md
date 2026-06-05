@@ -163,7 +163,7 @@ Available placeholders: `{graph}`, `{graph_dir}`, `{graph_mtx_dir}`,
 over a single `command` string when paths may contain spaces. A shell-like
 `command = "..."` string is also supported for simple cases.
 
-# Adding Your Own Solver
+## Adding Your Own Solver
 
 `CFPQ_Evaluator` runs solvers as external commands.
 
